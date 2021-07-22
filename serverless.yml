@@ -1,0 +1,125 @@
+app: api
+tenant:Guilherme Alencar Cruz da Silva
+service: serverless-challenge
+frameworkVersion: ">=1.1.0"
+
+provider:
+  name: aws
+  runtime: python3.8
+  apiGateway:
+    shouldStartNameWithService: true
+  region: sa-east-1
+  environment:
+    DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+        - dynamodb:BatchWriteItem
+        - dynamodb:BatchGetItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+                "arn:aws:s3:::self:provider.environment.S3_BUCKET/*"
+        - Effect: Allow
+      Action:
+        - s3:ListBucket
+      Resource: "arn:aws:s3:::instagraoguilhermealencar"
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+        - s3:DeleteObject
+      Resource: "arn:aws:s3:::instagraoguilhermealencar/uploads/*"  
+      
+functions:
+  extractMetadata:
+    handler: handler.extractMetadata
+    description:
+    memorySize: 128
+    timeout: 30
+    events:
+      - s3:
+          bucket: ${self:provider.environment.S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .jpg
+      - s3:
+          bucket: challenge-bucket
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .png
+      - s3:
+          bucket: challenge-bucket
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .jpeg   
+      - s3:
+          bucket: challenge-bucket
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: uploads/
+            - suffix: .gif
+            
+  getMetadata:
+    handler: handler.getMetadata
+    description:
+    memorySize: 128
+    timeout: 30
+    events:
+      - http:
+          path: getMetadata/{s3objectkey}
+          method: get
+          cors: true
+		  
+  GetImage:
+    handler: handler.infoImages
+    description:
+    memorySize: 128
+    timeout: 30
+    events:
+      - http:
+          path: images/info
+          method: get
+          cors: true
+          
+    InfoImages:
+      handler: handler.infoImages
+      description:
+      memorySize: 128
+      timeout: 30
+      event:
+        - http:
+            path: infoImages/
+            method:get
+            cors: true
+resources:
+  Resources:
+    ImagesDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: s3objectkey
+            AttributeType: S
+        KeySchema:
+          - AttributeName: s3objectkey
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+        
+custom:
+  apigwBinary:
+    types:
+      - '*/*'
+plugins:
+  - serverless-python-requirements
+  - serverless-apigw-binary
+  - serverless-apigwy-binary
